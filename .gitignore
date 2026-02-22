@@ -1,2 +1,6 @@
-.env.local
-node_modules
+.next/
+node_modules/
+.env*.local
+.vscode/
+out/
+build/
