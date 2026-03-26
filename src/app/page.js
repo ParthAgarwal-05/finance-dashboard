@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import Auth from '@/components/Auth';
 import { 
   Wallet, 
   ArrowUpCircle, 
@@ -17,7 +18,12 @@ import {
   Tag, 
   Edit2, 
   Calendar,
-  X
+  X,
+  LogOut,
+  Moon,
+  Sun,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -49,13 +55,15 @@ const MONTHS = [
 const YEARS = [2024, 2025, 2026];
 
 export default function Dashboard() {
+  const [session, setSession] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  
+  const [darkMode, setDarkMode] = useState(false);
+
   const [formData, setFormData] = useState({
     description: '',
     amount: '',
@@ -63,23 +71,50 @@ export default function Dashboard() {
     type: 'expense'
   });
 
+  // Check for session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Dark Mode Logic
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
   // 1. Fetch data from Supabase
   const fetchTransactions = useCallback(async () => {
+    if (!session) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
 
     if (error) console.error('Error fetching:', error);
     else setTransactions(data || []);
     setLoading(false);
-  }, []);
+  }, [session]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchTransactions();
-  }, [fetchTransactions]);
+    if (session) {
+      fetchTransactions();
+    }
+  }, [session, fetchTransactions]);
 
   // 2. Filtered Transactions Logic
   const filteredTransactions = useMemo(() => {
@@ -124,7 +159,8 @@ export default function Dashboard() {
     e.preventDefault();
     const payload = {
       ...formData,
-      amount: parseFloat(formData.amount)
+      amount: parseFloat(formData.amount),
+      user_id: session.user.id
     };
 
     if (editingId) {
@@ -132,7 +168,7 @@ export default function Dashboard() {
         .from('transactions')
         .update(payload)
         .eq('id', editingId);
-      
+
       if (error) alert(error.message);
       else {
         setEditingId(null);
@@ -175,21 +211,87 @@ export default function Dashboard() {
     else fetchTransactions();
   };
 
+  const exportToCSV = () => {
+    if (filteredTransactions.length === 0) {
+      alert('No transaction data to export.');
+      return;
+    }
+
+    const headers = ['Date', 'Description', 'Category', 'Amount', 'Type'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredTransactions.map(t => [
+        new Date(t.created_at).toLocaleDateString(),
+        `"${t.description.replace(/"/g, '""')}"`,
+        t.category,
+        t.amount,
+        t.type
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToExcel = async () => {
+    if (filteredTransactions.length === 0) {
+      alert('No transaction data to export.');
+      return;
+    }
+
+    const xlsx = await import('xlsx');
+    const worksheet = xlsx.utils.json_to_sheet(filteredTransactions.map(t => ({
+      Date: new Date(t.created_at).toLocaleDateString(),
+      Description: t.description,
+      Category: t.category,
+      Amount: t.amount,
+      Type: t.type
+    })));
+    const workbook = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+    xlsx.writeFile(workbook, `transactions_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (!session) {
+    return <Auth onAuthSuccess={() => {}} />;
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 text-slate-900 font-sans">
+    <div className={`min-h-screen transition-colors duration-300 ${darkMode ? 'bg-black text-slate-100' : 'bg-slate-50 text-slate-900'} p-4 md:p-8 font-sans`}>
       <div className="max-w-6xl mx-auto">
-        
+
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Finance Pro</h1>
-            <p className="text-slate-500">Intelligent money management for your goals.</p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">Finance Pro</h1>
+              <button 
+                onClick={() => setDarkMode(!darkMode)}
+                className={`p-2 rounded-xl transition-all ${darkMode ? 'bg-zinc-900 text-gold border border-gold/50 shadow-[0_0_15px_rgba(212,175,55,0.2)]' : 'bg-white text-indigo-600 shadow-sm border border-slate-200'}`}
+              >
+                {darkMode ? <Sun size={20}/> : <Moon size={20}/>}
+              </button>
+            </div>
+            <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Intelligent money management for your goals.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <select 
-                className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 appearance-none text-sm font-medium"
+                className={`pl-10 pr-8 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-gold appearance-none text-sm font-medium ${
+                  darkMode ? 'bg-zinc-900 border-gold/20 text-slate-200' : 'bg-white border-slate-200 text-slate-900'
+                }`}
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
               >
@@ -199,7 +301,9 @@ export default function Dashboard() {
             </div>
             <div className="relative">
               <select 
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 appearance-none text-sm font-medium"
+                className={`px-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-gold appearance-none text-sm font-medium ${
+                  darkMode ? 'bg-zinc-900 border-gold/20 text-slate-200' : 'bg-white border-slate-200 text-slate-900'
+                }`}
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
               >
@@ -207,53 +311,58 @@ export default function Dashboard() {
                 {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
+            <button 
+              onClick={handleLogout}
+              className={`p-2 rounded-xl transition-all ${darkMode ? 'bg-zinc-900 text-rose-400 border border-gold/20 hover:bg-rose-900/20' : 'bg-white text-rose-600 shadow-sm border border-slate-200 hover:bg-rose-50'}`}
+              title="Logout"
+            >
+              <LogOut size={20}/>
+            </button>
           </div>
         </header>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className={`${darkMode ? 'bg-zinc-900 border-gold/20' : 'bg-white border-slate-200'} p-6 rounded-2xl shadow-sm border`}>
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600"><Wallet size={24}/></div>
+              <div className={`p-3 ${darkMode ? 'bg-gold/10 text-gold' : 'bg-indigo-50 text-indigo-600'} rounded-xl`}><Wallet size={24}/></div>
               <div>
-                <p className="text-sm font-medium text-slate-500">Total Balance</p>
-                <p className={`text-2xl font-bold ${balance < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Balance</p>
+                <p className={`text-2xl font-bold ${balance < 0 ? 'text-rose-600' : (darkMode ? 'text-gold' : 'text-slate-900')}`}>
                   ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className={`${darkMode ? 'bg-zinc-900 border-gold/20' : 'bg-white border-slate-200'} p-6 rounded-2xl shadow-sm border`}>
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600"><ArrowUpCircle size={24}/></div>
+              <div className={`p-3 ${darkMode ? 'bg-emerald-900/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'} rounded-xl`}><ArrowUpCircle size={24}/></div>
               <div>
-                <p className="text-sm font-medium text-slate-500">Income</p>
-                <p className="text-2xl font-bold text-emerald-600">+${income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Income</p>
+                <p className="text-2xl font-bold text-emerald-500">+${income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className={`${darkMode ? 'bg-zinc-900 border-gold/20' : 'bg-white border-slate-200'} p-6 rounded-2xl shadow-sm border`}>
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-rose-50 rounded-xl text-rose-600"><ArrowDownCircle size={24}/></div>
+              <div className={`p-3 ${darkMode ? 'bg-rose-900/20 text-rose-400' : 'bg-rose-50 text-rose-600'} rounded-xl`}><ArrowDownCircle size={24}/></div>
               <div>
-                <p className="text-sm font-medium text-slate-500">Expenses</p>
-                <p className="text-2xl font-bold text-rose-600">-${expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Expenses</p>
+                <p className="text-2xl font-bold text-rose-500">-${expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          {/* Left Column: Form & Category Breakdown */}
+
           <div className="lg:col-span-4 space-y-8">
-            {/* Form Section */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div className={`${darkMode ? 'bg-zinc-900 border-gold/20' : 'bg-white border-slate-200'} p-6 rounded-2xl shadow-sm border`}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold flex items-center gap-2 text-slate-800">
-                  {editingId ? <Edit2 size={20} className="text-indigo-600"/> : <Plus size={20} className="text-indigo-600"/>}
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  {editingId ? <Edit2 size={20} className={darkMode ? 'text-gold' : 'text-indigo-600'}/> : <Plus size={20} className={darkMode ? 'text-gold' : 'text-indigo-600'}/>}
                   {editingId ? 'Update Transaction' : 'Add Transaction'}
                 </h2>
                 {editingId && (
@@ -268,7 +377,9 @@ export default function Dashboard() {
                   <input 
                     required
                     type="text" 
-                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full mt-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-gold ${
+                      darkMode ? 'bg-black border-gold/20 text-slate-200 placeholder:text-slate-600' : 'bg-slate-50 border-slate-200'
+                    }`}
                     placeholder="e.g. Monthly Rent"
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -280,7 +391,9 @@ export default function Dashboard() {
                     required
                     type="number" 
                     step="0.01"
-                    className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                    className={`w-full mt-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-gold ${
+                      darkMode ? 'bg-black border-gold/20 text-slate-200 placeholder:text-slate-600' : 'bg-slate-50 border-slate-200'
+                    }`}
                     placeholder="0.00"
                     value={formData.amount}
                     onChange={(e) => setFormData({...formData, amount: e.target.value})}
@@ -290,7 +403,9 @@ export default function Dashboard() {
                   <div>
                     <label className="text-xs font-semibold uppercase text-slate-400">Type</label>
                     <select 
-                      className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg"
+                      className={`w-full mt-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-gold ${
+                        darkMode ? 'bg-black border-gold/20 text-slate-200' : 'bg-slate-50 border-slate-200'
+                      }`}
                       value={formData.type}
                       onChange={(e) => setFormData({...formData, type: e.target.value})}
                     >
@@ -301,7 +416,9 @@ export default function Dashboard() {
                   <div>
                     <label className="text-xs font-semibold uppercase text-slate-400">Category</label>
                     <select 
-                      className="w-full mt-1 p-2 bg-slate-50 border border-slate-200 rounded-lg"
+                      className={`w-full mt-1 p-2 border rounded-lg outline-none focus:ring-2 focus:ring-gold ${
+                        darkMode ? 'bg-black border-gold/20 text-slate-200' : 'bg-slate-50 border-slate-200'
+                      }`}
                       value={formData.category}
                       onChange={(e) => setFormData({...formData, category: e.target.value})}
                     >
@@ -313,16 +430,18 @@ export default function Dashboard() {
                     </select>
                   </div>
                 </div>
-                <button type="submit" className="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
+                <button type="submit" className={`w-full py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 ${
+                  darkMode 
+                    ? 'bg-gold text-black hover:bg-gold-hover shadow-gold/20' 
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100'
+                }`}>
                   {editingId ? 'Update Record' : 'Save Transaction'}
                 </button>
               </form>
             </div>
 
-            {/* Category Breakdown Section */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h2 className="text-lg font-bold mb-6 text-slate-800">Spending by Category</h2>
-              
+            <div className={`${darkMode ? 'bg-zinc-900 border-gold/20' : 'bg-white border-slate-200'} p-6 rounded-2xl shadow-sm border`}>
+              <h2 className="text-lg font-bold mb-6">Spending by Category</h2>
               {categoryData.length > 0 ? (
                 <>
                   <div className="h-64 mb-6">
@@ -336,30 +455,35 @@ export default function Dashboard() {
                           dataKey="value"
                         >
                           {categoryData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell key={`cell-${index}`} fill={darkMode ? (index % 2 === 0 ? '#d4af37' : '#aa841e') : COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
                         <Tooltip 
                           formatter={(value) => [`$${value.toFixed(2)}`, 'Amount']}
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                          contentStyle={{ 
+                            borderRadius: '12px', 
+                            border: darkMode ? '1px solid rgba(212,175,55,0.3)' : 'none', 
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            backgroundColor: darkMode ? '#000000' : '#ffffff',
+                            color: darkMode ? '#d4af37' : '#0f172a'
+                          }}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-
                   <div className="space-y-4">
                     {categoryData.map((cat, index) => (
                       <div key={cat.name}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-slate-700">{cat.name}</span>
-                          <span className="text-slate-500">${cat.value.toFixed(0)} ({cat.percentage.toFixed(1)}%)</span>
+                          <span className="font-medium">{cat.name}</span>
+                          <span className={`${darkMode ? 'text-gold' : 'text-slate-500'}`}>${cat.value.toFixed(0)} ({cat.percentage.toFixed(1)}%)</span>
                         </div>
-                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div className={`w-full ${darkMode ? 'bg-black/50' : 'bg-slate-100'} h-2 rounded-full overflow-hidden`}>
                           <div 
                             className="h-full rounded-full transition-all duration-500"
                             style={{ 
                               width: `${cat.percentage}%`, 
-                              backgroundColor: COLORS[index % COLORS.length] 
+                              backgroundColor: darkMode ? (index % 2 === 0 ? '#d4af37' : '#aa841e') : COLORS[index % COLORS.length] 
                             }}
                           />
                         </div>
@@ -368,34 +492,63 @@ export default function Dashboard() {
                   </div>
                 </>
               ) : (
-                <div className="py-10 text-center text-slate-400">
+                <div className={`py-10 text-center ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                   No expense data to display for this period.
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Column: Transactions List */}
           <div className="lg:col-span-8">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <h2 className="text-lg font-bold text-slate-800">Transaction History</h2>
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Search transactions..."
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+            <div className={`${darkMode ? 'bg-zinc-900 border-gold/20' : 'bg-white border-slate-200'} rounded-2xl shadow-sm border overflow-hidden`}>
+              <div className={`p-6 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 ${darkMode ? 'border-gold/10' : 'border-slate-100'}`}>
+                <h2 className="text-lg font-bold">Transaction History</h2>
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text" 
+                      placeholder="Search transactions..."
+                      className={`w-full pl-10 pr-4 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-gold text-sm ${
+                        darkMode ? 'bg-black border-gold/20 text-slate-200 placeholder:text-slate-600' : 'bg-slate-50 border-slate-200'
+                      }`}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={exportToCSV}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                        darkMode 
+                          ? 'bg-zinc-900 text-gold border border-gold/20 hover:bg-gold/10' 
+                          : 'bg-white text-indigo-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                      title="Export CSV"
+                    >
+                      <Download size={16} />
+                      <span className="hidden md:inline">CSV</span>
+                    </button>
+                    <button 
+                      onClick={exportToExcel}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                        darkMode 
+                          ? 'bg-zinc-900 text-gold border border-gold/20 hover:bg-gold/10' 
+                          : 'bg-white text-indigo-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                      title="Export Excel"
+                    >
+                      <FileSpreadsheet size={16} />
+                      <span className="hidden md:inline">Excel</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="divide-y divide-slate-100">
+              <div className={`divide-y ${darkMode ? 'divide-gold/10' : 'divide-slate-100'}`}>
                 {loading ? (
                   <div className="p-20 flex flex-col items-center justify-center text-slate-400">
-                    <Loader2 className="animate-spin mb-4" size={32} />
+                    <Loader2 className={`animate-spin mb-4 ${darkMode ? 'text-gold' : ''}`} size={32} />
                     <p>Loading transactions...</p>
                   </div>
                 ) : filteredTransactions.length === 0 ? (
@@ -408,19 +561,25 @@ export default function Dashboard() {
                   filteredTransactions.map((t) => (
                     <div 
                       key={t.id} 
-                      className={`p-4 flex items-center justify-between hover:bg-slate-50 transition-all cursor-pointer group ${editingId === t.id ? 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200' : ''}`}
+                      className={`p-4 flex items-center justify-between transition-all cursor-pointer group ${
+                        editingId === t.id 
+                          ? (darkMode ? 'bg-gold/10 ring-1 ring-inset ring-gold/30' : 'bg-indigo-50/50 ring-1 ring-inset ring-indigo-200') 
+                          : (darkMode ? 'hover:bg-black/40' : 'hover:bg-slate-50')
+                      }`}
                       onClick={() => startEdit(t)}
                     >
                       <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-2xl flex items-center justify-center ${
-                          t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                          t.type === 'income' 
+                            ? (darkMode ? 'bg-emerald-900/20 text-emerald-400 border border-emerald-900/30' : 'bg-emerald-50 text-emerald-600') 
+                            : (darkMode ? 'bg-rose-900/20 text-rose-400 border border-rose-900/30' : 'bg-rose-50 text-rose-600')
                         }`}>
                           {getCategoryIcon(t.category)}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-800">{t.description}</p>
+                          <p className="font-bold">{t.description}</p>
                           <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                            <span className="bg-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider">{t.category}</span>
+                            <span className={`${darkMode ? 'bg-black text-gold border border-gold/20' : 'bg-slate-100'} px-2 py-0.5 rounded-md uppercase tracking-wider`}>{t.category}</span>
                             <span>•</span>
                             <span>{new Date(t.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           </div>
@@ -428,20 +587,20 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <p className={`font-black text-lg ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                          <p className={`font-black text-lg ${t.type === 'income' ? 'text-emerald-500' : (darkMode ? 'text-gold' : 'text-slate-900')}`}>
                             {t.type === 'income' ? '+' : '-'}${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
                             onClick={(e) => { e.stopPropagation(); startEdit(t); }} 
-                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-gold hover:bg-black' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
                           >
                             <Edit2 size={16}/>
                           </button>
                           <button 
                             onClick={(e) => { e.stopPropagation(); deleteTransaction(t.id); }} 
-                            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className={`p-2 rounded-lg transition-colors ${darkMode ? 'text-slate-400 hover:text-rose-400 hover:bg-black' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
                           >
                             <Trash2 size={16}/>
                           </button>
@@ -452,13 +611,12 @@ export default function Dashboard() {
                 )}
               </div>
               
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400 font-medium">
+              <div className={`p-4 border-t flex justify-between items-center text-xs text-slate-400 font-medium ${darkMode ? 'bg-black/50 border-gold/10' : 'bg-slate-50 border-slate-100'}`}>
                 <span>Showing {filteredTransactions.length} of {transactions.length} items</span>
                 <span>Sorted by Newest</span>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
