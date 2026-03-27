@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Auth from '@/components/Auth';
+import StockPortfolio from '@/components/StockPortfolio';
 import { 
   Wallet, 
   ArrowUpCircle, 
@@ -23,7 +24,9 @@ import {
   Moon,
   Sun,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  PieChart as PieChartIcon,
+  TrendingUp
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -63,6 +66,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [darkMode, setDarkMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('transactions'); // 'transactions' or 'stocks'
 
   const [formData, setFormData] = useState({
     description: '',
@@ -321,7 +325,35 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Stats Grid */}
+        {/* Tab Switcher */}
+        <div className="flex gap-2 mb-8 p-1 w-fit rounded-2xl bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-gold/20">
+          <button 
+            onClick={() => setActiveTab('transactions')}
+            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'transactions' 
+                ? (darkMode ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'bg-white text-indigo-600 shadow-sm') 
+                : (darkMode ? 'text-slate-400 hover:text-gold' : 'text-slate-500 hover:text-indigo-600')
+            }`}
+          >
+            <Wallet size={18} />
+            Transactions
+          </button>
+          <button 
+            onClick={() => setActiveTab('stocks')}
+            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'stocks' 
+                ? (darkMode ? 'bg-gold text-black shadow-lg shadow-gold/20' : 'bg-white text-indigo-600 shadow-sm') 
+                : (darkMode ? 'text-slate-400 hover:text-gold' : 'text-slate-500 hover:text-indigo-600')
+            }`}
+          >
+            <TrendingUp size={18} />
+            Stock Portfolio
+          </button>
+        </div>
+
+        {activeTab === 'transactions' ? (
+          <>
+            {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <div className={`${darkMode ? 'bg-zinc-900 border-gold/20' : 'bg-white border-slate-200'} p-6 rounded-2xl shadow-sm border`}>
             <div className="flex items-center gap-4">
@@ -329,7 +361,7 @@ export default function Dashboard() {
               <div>
                 <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total Balance</p>
                 <p className={`text-2xl font-bold ${balance < 0 ? 'text-rose-600' : (darkMode ? 'text-gold' : 'text-slate-900')}`}>
-                  ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -340,7 +372,7 @@ export default function Dashboard() {
               <div className={`p-3 ${darkMode ? 'bg-emerald-900/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'} rounded-xl`}><ArrowUpCircle size={24}/></div>
               <div>
                 <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Income</p>
-                <p className="text-2xl font-bold text-emerald-500">+${income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className="text-2xl font-bold text-emerald-500">+₹{income.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           </div>
@@ -350,7 +382,7 @@ export default function Dashboard() {
               <div className={`p-3 ${darkMode ? 'bg-rose-900/20 text-rose-400' : 'bg-rose-50 text-rose-600'} rounded-xl`}><ArrowDownCircle size={24}/></div>
               <div>
                 <p className={`text-sm font-medium ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Expenses</p>
-                <p className="text-2xl font-bold text-rose-500">-${expenses.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                <p className="text-2xl font-bold text-rose-500">-₹{expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
           </div>
@@ -386,7 +418,7 @@ export default function Dashboard() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-400">Amount ($)</label>
+                  <label className="text-xs font-semibold uppercase text-slate-400">Amount (₹)</label>
                   <input 
                     required
                     type="number" 
@@ -459,7 +491,7 @@ export default function Dashboard() {
                           ))}
                         </Pie>
                         <Tooltip 
-                          formatter={(value) => [`$${value.toFixed(2)}`, 'Amount']}
+                          formatter={(value) => [`₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 'Amount']}
                           contentStyle={{ 
                             borderRadius: '12px', 
                             border: darkMode ? '1px solid rgba(212,175,55,0.3)' : 'none', 
@@ -476,7 +508,7 @@ export default function Dashboard() {
                       <div key={cat.name}>
                         <div className="flex justify-between text-sm mb-1">
                           <span className="font-medium">{cat.name}</span>
-                          <span className={`${darkMode ? 'text-gold' : 'text-slate-500'}`}>${cat.value.toFixed(0)} ({cat.percentage.toFixed(1)}%)</span>
+                          <span className={`${darkMode ? 'text-gold' : 'text-slate-500'}`}>₹{cat.value.toLocaleString('en-IN')} ({cat.percentage.toFixed(1)}%)</span>
                         </div>
                         <div className={`w-full ${darkMode ? 'bg-black/50' : 'bg-slate-100'} h-2 rounded-full overflow-hidden`}>
                           <div 
@@ -588,7 +620,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p className={`font-black text-lg ${t.type === 'income' ? 'text-emerald-500' : (darkMode ? 'text-gold' : 'text-slate-900')}`}>
-                            {t.type === 'income' ? '+' : '-'}${Number(t.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {t.type === 'income' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -618,6 +650,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+          </>
+        ) : (
+          <StockPortfolio session={session} darkMode={darkMode} />
+        )}
       </div>
     </div>
   );
