@@ -16,7 +16,8 @@ import {
   ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 
 export default function StockPortfolio({ session, darkMode }) {
@@ -81,16 +82,16 @@ export default function StockPortfolio({ session, darkMode }) {
       
       const newPrices = { ...prices };
       result.data.forEach(stock => {
-        if (stock.success) {
-          newPrices[stock.symbol] = {
-            price: stock.price,
-            change: stock.change,
-            changePercent: stock.changePercent,
-            currency: stock.currency || 'INR',
-            name: stock.name,
-            updatedAt: new Date().toLocaleTimeString()
-          };
-        }
+        // We store the stock info even if success is false, so the UI can show the specific error
+        newPrices[stock.symbol] = {
+          price: stock.price || null,
+          change: stock.change || 0,
+          changePercent: stock.changePercent || 0,
+          currency: stock.currency || 'INR',
+          name: stock.name || stock.symbol,
+          error: stock.success ? null : (stock.error || 'Invalid Symbol'),
+          updatedAt: new Date().toLocaleTimeString()
+        };
       });
       
       setPrices(newPrices);
@@ -101,20 +102,22 @@ export default function StockPortfolio({ session, darkMode }) {
     }
   };
 
-  // Portfolio Calculations
+  // Portfolio Calculations - Made super robust to handle NaNs or missing data
   const stats = useMemo(() => {
     let currentTotal = 0;
     let costBasis = 0;
     
     portfolio.forEach(item => {
-      const price = prices[item.symbol]?.price;
-      const cost = Number(item.avg_cost) * Number(item.shares);
+      const priceData = prices[item.symbol];
+      const shares = parseFloat(item.shares) || 0;
+      const avgCost = parseFloat(item.avg_cost) || 0;
+      
+      const cost = avgCost * shares;
       costBasis += cost;
       
-      if (price) {
-        currentTotal += Number(price) * Number(item.shares);
+      if (priceData && priceData.price) {
+        currentTotal += parseFloat(priceData.price) * shares;
       } else {
-        // Fallback to cost if price is missing, but it's not ideal
         currentTotal += cost;
       }
     });
@@ -123,10 +126,10 @@ export default function StockPortfolio({ session, darkMode }) {
     const totalPLPercent = costBasis > 0 ? (totalPL / costBasis) * 100 : 0;
     
     return {
-      currentTotal,
-      costBasis,
-      totalPL,
-      totalPLPercent
+      currentTotal: isNaN(currentTotal) ? 0 : currentTotal,
+      costBasis: isNaN(costBasis) ? 0 : costBasis,
+      totalPL: isNaN(totalPL) ? 0 : totalPL,
+      totalPLPercent: isNaN(totalPLPercent) ? 0 : totalPLPercent
     };
   }, [portfolio, prices]);
 
@@ -134,16 +137,29 @@ export default function StockPortfolio({ session, darkMode }) {
   const handleAddStock = async (e) => {
     e.preventDefault();
     
-    let symbol = formData.symbol.toUpperCase().trim();
-    if (!symbol.endsWith('.NS') && !symbol.endsWith('.BO')) {
-      symbol += exchange;
+    // Validation
+    const sharesNum = parseFloat(formData.shares);
+    const costNum = parseFloat(formData.avg_cost);
+    
+    if (isNaN(sharesNum) || sharesNum <= 0) {
+      return handleError('Input Error', 'Quantity must be a valid number greater than 0.');
     }
+    if (isNaN(costNum) || costNum < 0) {
+      return handleError('Input Error', 'Avg. Buy Price must be 0 or greater.');
+    }
+
+    let symbol = formData.symbol.toUpperCase().trim();
+    if (!symbol) return handleError('Input Error', 'Stock symbol is required.');
+
+    // Remove any exchange suffix user might have typed to re-apply correctly
+    symbol = symbol.split('.')[0];
+    symbol += exchange;
 
     const payload = {
       user_id: session.user.id,
       symbol: symbol,
-      shares: parseFloat(formData.shares),
-      avg_cost: parseFloat(formData.avg_cost)
+      shares: sharesNum,
+      avg_cost: costNum
     };
 
     try {
@@ -326,7 +342,7 @@ export default function StockPortfolio({ session, darkMode }) {
                 portfolio.map((item) => {
                   const data = prices[item.symbol];
                   const currentPrice = data?.price;
-                  const value = currentPrice ? currentPrice * item.shares : 0;
+                  const value = currentPrice ? currentPrice * item.shares : (item.shares * item.avg_cost);
                   const profit = currentPrice ? (currentPrice - item.avg_cost) * item.shares : 0;
                   const profitPercent = (currentPrice && item.avg_cost > 0) ? (currentPrice - item.avg_cost) / item.avg_cost * 100 : 0;
 
@@ -344,10 +360,15 @@ export default function StockPortfolio({ session, darkMode }) {
                           <div>
                             <div className="font-black text-sm flex items-center gap-2">
                               {item.symbol.split('.')[0]}
+                              {data?.error && <AlertTriangle size={14} className="text-rose-500" title={data.error} />}
                               <ChevronRight size={12} className="text-slate-400" />
                             </div>
                             <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                              {data?.name || (item.symbol.endsWith('.NS') ? 'National Stock Exchange' : 'Bombay Stock Exchange')}
+                              {data?.error ? (
+                                <span className="text-rose-500 font-black">{data.error}</span>
+                              ) : (
+                                data?.name || (item.symbol.endsWith('.NS') ? 'National Stock Exchange' : 'Bombay Stock Exchange')
+                              )}
                             </div>
                           </div>
                         </div>
@@ -358,10 +379,10 @@ export default function StockPortfolio({ session, darkMode }) {
                             ? `₹${currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` 
                             : <span className="text-slate-400">---</span>}
                         </div>
-                        {data?.updatedAt && <p className="text-[9px] text-slate-500">at {data.updatedAt}</p>}
+                        {data?.updatedAt && !data.error && <p className="text-[9px] text-slate-500">at {data.updatedAt}</p>}
                       </td>
                       <td className="px-6 py-5">
-                        {data ? (
+                        {data && !data.error ? (
                           <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-black ${data.change >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
                             {data.change >= 0 ? '+' : ''}{data.changePercent.toFixed(2)}%
                           </div>
@@ -375,9 +396,9 @@ export default function StockPortfolio({ session, darkMode }) {
                       </td>
                       <td className="px-6 py-5 text-right">
                         <div className="font-black text-sm">
-                          {value > 0 ? `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '---'}
+                          ₹{value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </div>
-                        {currentPrice && (
+                        {currentPrice && !data.error && (
                           <div className={`text-[10px] font-black ${profit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                             {profit >= 0 ? '+' : ''}₹{Math.abs(profit).toLocaleString('en-IN')} ({profitPercent.toFixed(1)}%)
                           </div>
@@ -386,7 +407,7 @@ export default function StockPortfolio({ session, darkMode }) {
                       <td className="px-6 py-5 text-right">
                         <button 
                           onClick={() => deleteStock(item.id, item.symbol)}
-                          className={`p-2 rounded-xl opacity-0 group-hover:opacity-100 transition-all ${darkMode ? 'text-slate-500 hover:text-rose-400 hover:bg-black' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
+                          className={`p-2 rounded-xl transition-all ${darkMode ? 'text-slate-500 hover:text-rose-400 hover:bg-black' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
                         >
                           <Trash2 size={16} />
                         </button>

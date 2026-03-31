@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 
 /**
  * High-Resilience Stock API
- * Uses v8 Chart API which is currently the most permissive Yahoo endpoint.
- * Includes server-side caching to prevent 429 Rate Limiting.
+ * Handles invalid symbols gracefully without breaking the entire request.
  */
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -14,13 +13,9 @@ export async function GET(request) {
   }
 
   const symbolArray = symbols.split(',').map(s => s.trim()).filter(Boolean);
-  
-  // 5-minute cache to avoid Yahoo 429 (Too Many Requests) blocks
   const CACHE_DURATION = 300; 
 
   try {
-    // Strategy: Fetch each symbol via the Chart v8 API
-    // This is more reliable for NSE than the batch quote API which is heavily protected.
     const fetchPromises = symbolArray.map(async (symbol) => {
       try {
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
@@ -34,51 +29,41 @@ export async function GET(request) {
           next: { revalidate: CACHE_DURATION }
         });
 
+        // 404 means the symbol doesn't exist. We handle this as a "soft" error.
+        if (response.status === 404) {
+          return { symbol, success: false, error: 'Invalid Symbol' };
+        }
+
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          return { symbol, success: false, error: `Server ${response.status}` };
         }
 
         const data = await response.json();
         const result = data?.chart?.result?.[0];
         
         if (!result || !result.meta) {
-          return { symbol, success: false, error: 'No data' };
+          return { symbol, success: false, error: 'No data available' };
         }
 
         const meta = result.meta;
         return {
           symbol,
           price: meta.regularMarketPrice,
-          change: meta.regularMarketPrice - meta.chartPreviousClose,
-          changePercent: ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100,
-          currency: meta.currency,
+          change: meta.regularMarketPrice - (meta.chartPreviousClose || meta.regularMarketPrice),
+          changePercent: meta.chartPreviousClose ? ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100 : 0,
+          currency: meta.currency || 'INR',
           name: symbol.split('.')[0],
           success: true
         };
       } catch (err) {
-        return { symbol, success: false, error: err.message };
+        return { symbol, success: false, error: 'Connection Timeout' };
       }
     });
 
     const results = await Promise.all(fetchPromises);
-    const successfulResults = results.filter(r => r.success);
 
-    if (successfulResults.length === 0) {
-      // If we got all errors, check if any were 429
-      const isRateLimited = results.some(r => r.error?.includes('429'));
-      const isForbidden = results.some(r => r.error?.includes('401') || r.error?.includes('403'));
-      
-      let errorMessage = 'Stock Market connection failed.';
-      if (isRateLimited) errorMessage = 'Yahoo Finance rate limit exceeded. Please wait 5 minutes.';
-      if (isForbidden) errorMessage = 'Access denied by Yahoo Finance. This often happens on shared cloud IPs.';
-
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Market Data Unavailable',
-        message: errorMessage
-      }, { status: isRateLimited ? 429 : 503 });
-    }
-
+    // We ALWAYS return success: true at the top level if the API logic itself didn't crash.
+    // This allows the frontend to show the table and let users delete the bad stocks.
     return NextResponse.json({
       success: true,
       data: results,
@@ -86,11 +71,11 @@ export async function GET(request) {
     });
 
   } catch (error) {
-    console.error('Final API Crash:', error);
+    console.error('Stock API Critical Failure:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Internal API Error',
-      message: error.message 
+      error: 'API Service Error',
+      message: 'The stock data service is having internal issues.'
     }, { status: 500 });
   }
 }
