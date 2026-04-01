@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import Auth from '@/components/Auth';
-import StockPortfolio from '@/components/StockPortfolio';
+import InvestmentPortfolio from '@/components/investment/InvestmentPortfolio';
 import { 
   Wallet, 
   ArrowUpCircle, 
@@ -65,7 +65,7 @@ export default function Dashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [darkMode, setDarkMode] = useState(false);
-  const [activeTab, setActiveTab] = useState('transactions'); // 'transactions' or 'stocks'
+  const [activeTab, setActiveTab] = useState('transactions'); // 'transactions' or 'investments'
 
   const [formData, setFormData] = useState({
     description: '',
@@ -334,15 +334,15 @@ export default function Dashboard() {
             Transactions
           </button>
           <button 
-            onClick={() => setActiveTab('stocks')}
+            onClick={() => setActiveTab('investments')}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
-              activeTab === 'stocks' 
+              activeTab === 'investments' 
                 ? 'bg-gold text-black shadow-lg shadow-gold/20' 
                 : 'text-muted hover:text-gold'
             }`}
           >
             <TrendingUp size={18} />
-            Stock Portfolio
+            Investment Portfolio
           </button>
         </div>
 
@@ -616,7 +616,7 @@ export default function Dashboard() {
         </div>
           </>
         ) : (
-          <StockPortfolio session={session} darkMode={darkMode} />
+          <InvestmentPortfolio session={session} darkMode={darkMode} />
         )}
       </div>
     </div>
