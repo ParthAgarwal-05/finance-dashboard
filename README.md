@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# My Finance Dashboard
 
-## Getting Started
+A comprehensive personal finance management tool built with Next.js, Supabase, and Tailwind CSS. Track your transactions, manage your investment portfolio, and visualize your financial health with intuitive charts.
 
-First, run the development server:
+## 🚀 Features
 
+- **Transaction Management**: Easily add, edit, and delete income and expense transactions.
+- **Categorization**: Organize your spending with smart icons and categories (Food, Transport, Rent, Salary, etc.).
+- **Investment Portfolio**: Track your stocks and mutual funds in a dedicated dashboard.
+- **Interactive Visualizations**: View your spending distribution and investment performance using Recharts.
+- **Authentication**: Secure login and session management powered by Supabase Auth.
+- **Dark Mode**: Toggle between light and dark themes for a comfortable viewing experience.
+- **Search & Filter**: Quickly find transactions by description or filter by month and year.
+- **Excel Export**: Export your financial data to Excel files using `xlsx`.
+
+## 🛠️ Tech Stack
+
+- **Frontend**: [Next.js](https://nextjs.org/) (App Router), [React](https://reactjs.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/), [Lucide React](https://lucide.dev/) (Icons)
+- **Database & Auth**: [Supabase](https://supabase.com/)
+- **Charts**: [Recharts](https://recharts.org/)
+- **Data Export**: [SheetJS (xlsx)](https://sheetjs.com/)
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
+
+## ⚙️ Setup & Installation
+
+### 1. Clone the repository
+```bash
+git clone <repository-url>
+cd my-finance-dashboard
+```
+
+### 2. Install dependencies
+```bash
+npm install
+```
+
+### 3. Configure Environment Variables
+Create a `.env.local` file in the root directory and add your Supabase credentials:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+You can find these in your Supabase Project Settings > API.
+
+### 4. Database Setup
+Ensure your Supabase database has the necessary tables (e.g., `transactions`, `investments`). You may need to set up Row Level Security (RLS) policies to allow users to manage their own data.
+
+### 5. Run the development server
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 🏗️ Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `src/app`: Next.js App Router pages and API routes.
+- `src/components`: Reusable UI components (Auth, Portfolio, Charts, etc.).
+- `src/hooks`: Custom React hooks for data fetching and state management.
+- `src/lib`: Utility functions and third-party library configurations (Supabase client).
+- `public`: Static assets like icons and images.
 
-## Learn More
+## 📜 License
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is licensed under the MIT License.
