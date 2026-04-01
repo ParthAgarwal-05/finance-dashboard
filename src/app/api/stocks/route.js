@@ -7,18 +7,20 @@ import { NextResponse } from 'next/server';
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const symbols = searchParams.get('symbols');
+  const range = searchParams.get('range') || '1d';
+  const interval = searchParams.get('interval') || '1d';
 
   if (!symbols) {
     return NextResponse.json({ success: false, error: 'No symbols provided' }, { status: 400 });
   }
 
   const symbolArray = symbols.split(',').map(s => s.trim()).filter(Boolean);
-  const CACHE_DURATION = 300; 
+  const CACHE_DURATION = range === '1d' ? 300 : 3600; // Cache historical data longer
 
   try {
     const fetchPromises = symbolArray.map(async (symbol) => {
       try {
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`;
         
         const response = await fetch(url, {
           headers: {
@@ -29,7 +31,6 @@ export async function GET(request) {
           next: { revalidate: CACHE_DURATION }
         });
 
-        // 404 means the symbol doesn't exist. We handle this as a "soft" error.
         if (response.status === 404) {
           return { symbol, success: false, error: 'Invalid Symbol' };
         }
@@ -46,6 +47,19 @@ export async function GET(request) {
         }
 
         const meta = result.meta;
+        const indicators = result.indicators?.quote?.[0] || {};
+        const timestamps = result.timestamp || [];
+
+        // Format historical data if range > 1d or requested explicitly
+        const history = timestamps.map((time, index) => ({
+          date: new Date(time * 1000).toISOString(),
+          open: indicators.open?.[index],
+          high: indicators.high?.[index],
+          low: indicators.low?.[index],
+          close: indicators.close?.[index],
+          volume: indicators.volume?.[index]
+        })).filter(d => d.close !== null);
+
         return {
           symbol,
           price: meta.regularMarketPrice,
@@ -53,6 +67,7 @@ export async function GET(request) {
           changePercent: meta.chartPreviousClose ? ((meta.regularMarketPrice - meta.chartPreviousClose) / meta.chartPreviousClose) * 100 : 0,
           currency: meta.currency || 'INR',
           name: symbol.split('.')[0],
+          history: range !== '1d' ? history : undefined,
           success: true
         };
       } catch (err) {

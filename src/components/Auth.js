@@ -64,37 +64,37 @@ export default function Auth({ onAuthSuccess }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-black px-4 transition-colors duration-300">
-      <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-3xl shadow-xl border border-slate-100 dark:border-gold/20 p-8 md:p-10">
+    <div className="min-h-screen flex items-center justify-center bg-app-bg text-app-fg px-4 transition-colors duration-300">
+      <div className="max-w-md w-full bg-card-bg rounded-3xl shadow-xl border border-card-border p-8 md:p-10">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center p-3 bg-indigo-600 dark:bg-gold rounded-2xl text-white dark:text-black mb-4 shadow-[0_0_15px_rgba(212,175,55,0.3)]">
+          <div className="inline-flex items-center justify-center p-3 bg-gold rounded-2xl text-black mb-4 shadow-[0_0_15px_rgba(212,175,55,0.3)]">
             <User size={32} />
           </div>
-          <h2 className="text-3xl font-bold text-slate-900 dark:text-gold tracking-tight">
+          <h2 className="text-3xl font-bold text-app-fg tracking-tight">
             {isSignUp ? 'Create Account' : 'Welcome Back'}
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-2">
+          <p className="text-muted mt-2">
             {isSignUp ? 'Start managing your finances today.' : 'Sign in to access your dashboard.'}
           </p>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-6">
           {error && (
-            <div className="bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 p-4 rounded-xl text-sm font-medium border border-rose-100 dark:border-rose-900/20 animate-pulse">
+            <div className="bg-rose-500/10 text-rose-500 p-4 rounded-xl text-sm font-medium border border-rose-500/20 animate-pulse">
               {error}
             </div>
           )}
 
           <div>
-            <label className="text-xs font-bold uppercase text-slate-400 mb-1 block tracking-wider">Username</label>
+            <label className="text-xs font-bold uppercase text-muted mb-1 block tracking-wider">Username</label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
               <input
                 required
                 name="username"
                 type="text"
                 placeholder="Enter your username"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold/20 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-gold transition-all text-slate-900 dark:text-slate-100"
+                className="w-full pl-10 pr-4 py-3 bg-app-bg border border-card-border rounded-xl outline-none focus:ring-2 focus:ring-gold transition-all text-app-fg placeholder:text-muted/50"
                 value={formData.username}
                 onChange={handleChange}
               />
@@ -102,15 +102,15 @@ export default function Auth({ onAuthSuccess }) {
           </div>
 
           <div>
-            <label className="text-xs font-bold uppercase text-slate-400 mb-1 block tracking-wider">Password</label>
+            <label className="text-xs font-bold uppercase text-muted mb-1 block tracking-wider">Password</label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
               <input
                 required
                 name="password"
                 type="password"
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold/20 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-gold transition-all text-slate-900 dark:text-slate-100"
+                className="w-full pl-10 pr-4 py-3 bg-app-bg border border-card-border rounded-xl outline-none focus:ring-2 focus:ring-gold transition-all text-app-fg placeholder:text-muted/50"
                 value={formData.password}
                 onChange={handleChange}
               />
@@ -119,15 +119,15 @@ export default function Auth({ onAuthSuccess }) {
 
           {isSignUp && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-              <label className="text-xs font-bold uppercase text-slate-400 mb-1 block tracking-wider">Confirm Password</label>
+              <label className="text-xs font-bold uppercase text-muted mb-1 block tracking-wider">Confirm Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
                 <input
                   required
                   name="confirmPassword"
                   type="password"
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-black border border-slate-200 dark:border-gold/20 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-gold transition-all text-slate-900 dark:text-slate-100"
+                  className="w-full pl-10 pr-4 py-3 bg-app-bg border border-card-border rounded-xl outline-none focus:ring-2 focus:ring-gold transition-all text-app-fg placeholder:text-muted/50"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                 />
@@ -138,7 +138,7 @@ export default function Auth({ onAuthSuccess }) {
           <button
             disabled={loading}
             type="submit"
-            className="w-full bg-indigo-600 dark:bg-gold text-white dark:text-black py-4 rounded-2xl font-bold hover:bg-indigo-700 dark:hover:bg-gold-hover transition-all shadow-lg shadow-indigo-100 dark:shadow-gold/20 flex items-center justify-center gap-2 group disabled:opacity-70"
+            className="w-full bg-gold text-black py-4 rounded-2xl font-bold hover:bg-gold-hover transition-all shadow-lg shadow-gold/20 flex items-center justify-center gap-2 group disabled:opacity-70"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={20} />
@@ -151,15 +151,15 @@ export default function Auth({ onAuthSuccess }) {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-gold/10 text-center">
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
+        <div className="mt-8 pt-6 border-t border-card-border text-center">
+          <p className="text-muted text-sm">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}
             <button
               onClick={() => {
                 setIsSignUp(!isSignUp);
                 setError(null);
               }}
-              className="ml-2 text-indigo-600 dark:text-gold font-bold hover:underline"
+              className="ml-2 text-gold font-bold hover:underline"
             >
               {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>

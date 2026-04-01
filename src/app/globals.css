@@ -1,29 +1,48 @@
 @import "tailwindcss";
 
+@theme {
+  --color-gold: #d4af37;
+  --color-gold-hover: #aa841e;
+  
+  --color-app-bg: var(--app-bg);
+  --color-app-fg: var(--app-fg);
+  --color-card-bg: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-input-bg: var(--input-bg);
+  --color-muted: var(--muted);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --app-bg: #f8fafc; /* slate-50 */
+  --app-fg: #0f172a; /* slate-900 */
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0; /* slate-200 */
+  --input-bg: #f8fafc;
+  --muted: #64748b; /* slate-500 */
 }
 
 .dark {
-  --background: #000000;
-  --foreground: #f8fafc;
-  --gold: #d4af37;
-  --gold-hover: #aa841e;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-gold: var(--gold);
-  --color-gold-hover: var(--gold-hover);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --app-bg: #000000;
+  --app-fg: #f1f5f9; /* slate-100 */
+  --card-bg: #09090b; /* zinc-950 */
+  --card-border: rgba(212, 175, 55, 0.2);
+  --input-bg: #000000;
+  --muted: #94a3b8; /* slate-400 */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background-color: var(--app-bg);
+  color: var(--app-fg);
+  font-family: sans-serif;
   transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Base styles for charts to handle theme */
+.recharts-text {
+  fill: currentColor !important;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: var(--card-border);
 }
